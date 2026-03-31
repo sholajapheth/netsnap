@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "NetSnap",
+  "version": "1.0.0",
+  "description": "Capture failed API requests and share them with your backend dev in one click.",
+  "author": "Shola Japheth (https://sholajapheth.com)",
+  "permissions": ["storage", "clipboardWrite"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "devtools_page": "devtools.html",
+  "action": {
+    "default_title": "NetSnap"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["viewer.html", "viewer.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

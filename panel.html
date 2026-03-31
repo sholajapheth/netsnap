@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetSnap</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f12;
+      --surface: #13161b;
+      --surface2: #1a1e25;
+      --border: #252932;
+      --border2: #2e3440;
+      --text: #e2e8f0;
+      --text-dim: #64748b;
+      --text-muted: #3d4a5c;
+      --accent: #f97316;
+      --red: #ef4444;
+      --red-dim: rgba(239,68,68,0.12);
+      --yellow: #f59e0b;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 12px;
+      overflow: hidden;
+    }
+
+    /* ── LAYOUT ── */
+    .app {
+      display: grid;
+      grid-template-rows: 48px 1fr 44px;
+      height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: var(--sans);
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: -0.03em;
+      color: var(--accent);
+    }
+
+    .logo span { color: var(--text-dim); font-weight: 400; }
+
+    .header-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--border2);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+    .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+    .btn.primary:hover { background: #fb923c; border-color: #fb923c; }
+    .btn.danger { color: var(--red); border-color: rgba(239,68,68,0.3); }
+    .btn.danger:hover { background: var(--red-dim); }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .header-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+
+    .capture-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .capture-toggle.active {
+      border-color: rgba(239,68,68,0.5);
+      color: var(--red);
+      background: var(--red-dim);
+    }
+    .capture-toggle .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .capture-toggle.active .dot {
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .count-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+    .count-badge.has-items { border-color: var(--accent); color: var(--accent); }
+
+    /* ── MAIN SPLIT ── */
+    .main {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      overflow: hidden;
+    }
+
+    /* ── LEFT: REQUEST LIST ── */
+    .request-list {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      background: var(--surface);
+    }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      z-index: 1;
+    }
+
+    .list-label {
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .empty-icon {
+      font-size: 28px;
+      opacity: 0.4;
+    }
+
+    .empty-title {
+      font-family: var(--sans);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-dim);
+    }
+
+    .empty-sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .request-item {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 6px;
+      align-items: start;
+    }
+    .request-item:hover { background: var(--surface2); }
+    .request-item.selected { background: rgba(249,115,22,0.08); border-left: 2px solid var(--accent); padding-left: 10px; }
+
+    .status-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 3px;
+      line-height: 1.4;
+      margin-top: 1px;
+    }
+    .status-4xx { background: rgba(239,68,68,0.2); color: var(--red); }
+    .status-5xx { background: rgba(245,158,11,0.2); color: var(--yellow); }
+    .status-2xx { background: rgba(34,197,94,0.15); color: var(--green); }
+    .status-other { background: rgba(148,163,184,0.1); color: var(--text-dim); }
+
+    .request-method {
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--blue);
+      letter-spacing: 0.05em;
+    }
+
+    .request-url {
+      font-size: 10px;
+      color: var(--text);
+      word-break: break-all;
+      line-height: 1.4;
+      grid-column: 1 / -1;
+      margin-top: 3px;
+      opacity: 0.8;
+    }
+
+    .request-time {
+      font-size: 9px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .add-btn {
+      grid-column: 3;
+      grid-row: 1;
+      padding: 2px 7px;
+      font-size: 9px;
+      border-radius: 3px;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-family: var(--mono);
+      transition: all 0.1s;
+      white-space: nowrap;
+    }
+    .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .add-btn.added { border-color: var(--green); color: var(--green); background: rgba(34,197,94,0.08); }
+
+    /* ── RIGHT: DETAIL VIEW ── */
+    .detail-view {
+      overflow-y: auto;
+      background: var(--bg);
+    }
+
+    .no-selection {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 8px;
+      color: var(--text-muted);
+    }
+
+    .no-selection-icon { font-size: 32px; opacity: 0.3; }
+    .no-selection-text { font-family: var(--sans); font-size: 12px; }
+
+    .detail-content { padding: 16px; }
+
+    .detail-section {
+      margin-bottom: 20px;
+    }
+
+    .detail-section-title {
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .detail-section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 12px;
+    }
+
+    .meta-key {
+      color: var(--text-dim);
+      font-size: 11px;
+    }
+
+    .meta-val {
+      color: var(--text);
+      font-size: 11px;
+      word-break: break-all;
+    }
+
+    pre.code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 10px 12px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--text);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    /* ── REPORT QUEUE ── */
+    .queue-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin: 16px;
+    }
+
+    .queue-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .queue-title {
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .queue-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 10.5px;
+    }
+    .queue-item:last-child { border-bottom: none; }
+
+    .queue-remove {
+      margin-left: auto;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1;
+      padding: 0 2px;
+      transition: color 0.1s;
+    }
+    .queue-remove:hover { color: var(--red); }
+
+    /* ── FOOTER ── */
+    .footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .footer-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-right: 4px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 54px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: var(--green);
+      color: #000;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 7px 16px;
+      border-radius: 20px;
+      opacity: 0;
+      transition: all 0.2s;
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .filter-bar {
+      display: flex;
+      gap: 4px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .filter-btn {
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--mono);
+      font-size: 10px;
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+    .filter-btn:hover { color: var(--text); }
+    .filter-btn.active { border-color: var(--accent); color: var(--accent); }
+
+    .view-tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .view-tab {
+      padding: 8px 14px;
+      font-family: var(--mono);
+      font-size: 10.5px;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.1s;
+    }
+    .view-tab:hover { color: var(--text); }
+    .view-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .view-pane { display: none; padding: 14px; }
+    .view-pane.active { display: block; }
+
+    #report-builder { padding: 0; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo">Net<span>Snap</span></div>
+    <div class="header-divider"></div>
+    <button class="capture-toggle active" id="captureToggle">
+      <span class="dot"></span>
+      <span id="captureLabel">Capturing</span>
+    </button>
+    <div class="header-divider"></div>
+    <span class="count-badge" id="queueBadge">0 in report</span>
+    <div class="header-right">
+      <button class="btn danger" id="clearAllBtn">✕ Clear All</button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- LEFT: LIVE REQUESTS -->
+    <div class="request-list" id="requestList">
+      <div class="list-header">
+        <span class="list-label">Network Log</span>
+        <button class="btn" id="clearLogBtn" style="padding:2px 7px;font-size:10px;">Clear</button>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="errors">Errors</button>
+        <button class="filter-btn" data-filter="all">All</button>
+      </div>
+      <div id="requestItems">
+        <div class="empty-state">
+          <div class="empty-icon">📡</div>
+          <div class="empty-title">Waiting for requests</div>
+          <div class="empty-sub">Reload the page or make API<br>calls to start capturing traffic.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: DETAIL + REPORT -->
+    <div class="detail-view" id="detailView">
+      <!-- Tabs -->
+      <div class="view-tabs">
+        <div class="view-tab active" data-tab="detail">Request Detail</div>
+        <div class="view-tab" data-tab="report">
+          Report Builder
+          <span class="count-badge has-items" id="reportTabBadge" style="display:none; margin-left:4px; font-size:9px;"></span>
+        </div>
+      </div>
+
+      <!-- Detail Pane -->
+      <div class="view-pane active" id="pane-detail">
+        <div class="no-selection" id="noSelection">
+          <div class="no-selection-icon">←</div>
+          <div class="no-selection-text">Select a request to inspect</div>
+        </div>
+        <div id="detailContent" style="display:none;"></div>
+      </div>
+
+      <!-- Report Builder Pane -->
+      <div class="view-pane" id="pane-report" style="padding:0;">
+        <div id="report-builder">
+          <div class="empty-state" id="reportEmpty" style="padding:40px 20px;">
+            <div class="empty-icon">📋</div>
+            <div class="empty-title">Report is empty</div>
+            <div class="empty-sub">Click "+ Add" on any request<br>to add it to your report.</div>
+          </div>
+          <div id="reportItems" style="display:none;">
+            <div class="queue-section" style="margin:12px;">
+              <div class="queue-header">
+                <span class="queue-title">📦 Report Queue</span>
+                <span id="reportCount" style="font-size:10px; color:var(--text-dim);"></span>
+              </div>
+              <div id="queueList"></div>
+            </div>
+            <div style="padding: 0 12px 12px; display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn primary" id="copyWhatsappBtn">📱 Copy for WhatsApp</button>
+              <button class="btn" id="copyJsonBtn">{ } Copy JSON</button>
+              <button class="btn" id="openViewerBtn">🔗 Open Viewer</button>
+            </div>
+
+            <div style="padding:0 12px 12px;">
+              <div class="detail-section-title">Preview</div>
+              <pre class="code-block" id="reportPreview" style="max-height:300px; font-size:10px;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <span class="footer-label">NetSnap v1.0</span>
+    <span style="color:var(--text-muted); font-size:10px;">— API Bug Reporter for Chrome DevTools</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="panel.js"></script>
+</body>
+</html>

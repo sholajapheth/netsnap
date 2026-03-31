@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetSnap Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0c10;
+      --surface: #111318;
+      --surface2: #181c24;
+      --border: #1f242e;
+      --text: #e2e8f0;
+      --text-dim: #64748b;
+      --accent: #f97316;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --green: #22c55e;
+      --blue: #60a5fa;
+      --mono: 'JetBrains Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      min-height: 100vh;
+      padding: 0 0 60px;
+    }
+
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(10,12,16,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      font-family: var(--sans);
+      font-weight: 800;
+      font-size: 18px;
+      letter-spacing: -0.04em;
+      color: var(--accent);
+    }
+    .logo span { color: var(--text-dim); font-weight: 400; }
+
+    .top-bar-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-left: auto;
+    }
+
+    .copy-btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover { background: var(--surface2); color: var(--text); }
+    .copy-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+    .copy-btn.primary:hover { background: #fb923c; }
+
+    .container { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+
+    .report-header {
+      margin-bottom: 32px;
+    }
+
+    .report-title {
+      font-family: var(--sans);
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .report-title .highlight { color: var(--accent); }
+
+    .report-meta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .meta-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+    }
+
+    /* Request Card */
+    .request-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    .req-num {
+      font-family: var(--sans);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-dim);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+
+    .status-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .s4 { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+    .s5 { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+    .s2 { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .so { background: rgba(148,163,184,0.1); color: var(--text-dim); border: 1px solid var(--border); }
+
+    .method-pill {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    .card-url {
+      font-size: 12px;
+      color: var(--text);
+      word-break: break-all;
+      flex: 1;
+      opacity: 0.85;
+    }
+
+    .card-time {
+      font-size: 10px;
+      color: var(--text-dim);
+      white-space: nowrap;
+      margin-left: auto;
+    }
+
+    .card-body { padding: 18px; }
+
+    .section-label {
+      font-family: var(--sans);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      margin-top: 16px;
+    }
+
+    .section-label:first-child { margin-top: 0; }
+
+    pre.block {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 11px;
+      line-height: 1.65;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text);
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 6px 16px;
+      font-size: 12px;
+    }
+    .ig-key { color: var(--text-dim); }
+    .ig-val { color: var(--text); word-break: break-all; }
+
+    /* Error highlight */
+    .error-banner {
+      background: rgba(239,68,68,0.06);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: var(--red);
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .toast-fixed {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      background: var(--green);
+      color: #000;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 9px 20px;
+      border-radius: 24px;
+      opacity: 0;
+      transition: all 0.2s;
+      pointer-events: none;
+      z-index: 100;
+    }
+    .toast-fixed.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 600px) {
+      .top-bar { padding: 12px 16px; }
+      .container { padding: 20px 16px; }
+      .report-title { font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="logo">Net<span>Snap</span></div>
+  <div class="top-bar-meta" id="topMeta">Loading report…</div>
+  <button class="copy-btn" id="copyJsonTopBtn">{ } Copy JSON</button>
+  <button class="copy-btn primary" id="copyWaTopBtn">📱 Copy for WhatsApp</button>
+</div>
+
+<div class="container">
+  <div class="report-header">
+    <h1 class="report-title">API Bug <span class="highlight">Report</span></h1>
+    <div class="report-meta" id="reportMeta"></div>
+  </div>
+  <div id="requestCards"></div>
+  <div id="errorMsg" style="display:none; color: var(--red); text-align:center; padding: 60px 20px;">
+    <div style="font-size:32px; margin-bottom:12px;">⚠️</div>
+    <div style="font-family:var(--sans); font-size:18px; font-weight:700;">Could not load report</div>
+    <div style="color:var(--text-dim); margin-top:8px; font-size:12px;">The report data may be missing or corrupted.</div>
+  </div>
+</div>
+
+<div class="toast-fixed" id="toast"></div>
+
+<script src="viewer.js"></script>
+</body>
+</html>

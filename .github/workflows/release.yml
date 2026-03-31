@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create extension zip
+        run: |
+          zip -r netsnap-extension-${{ steps.version.outputs.VERSION }}.zip . \
+            --exclude ".git/*" \
+            --exclude ".github/*" \
+            --exclude "*.md" \
+            --exclude "LICENSE" \
+            --exclude "{icons}/*"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "NetSnap ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## Install
+
+            1. Download `netsnap-extension-${{ steps.version.outputs.VERSION }}.zip` below
+            2. Unzip it
+            3. Go to `chrome://extensions` → enable **Developer mode**
+            4. Click **Load unpacked** → select the unzipped folder
+            5. Open DevTools on any page → find the **NetSnap** tab
+
+            See [README](https://github.com/${{ github.repository }}#readme) for full usage guide.
+          files: netsnap-extension-${{ steps.version.outputs.VERSION }}.zip
+          draft: false
+          prerelease: false
