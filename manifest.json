@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Capture failed API requests and share them with your backend dev in one click.",
   "author": "Shola Japheth (https://sholajapheth.com)",
-  "permissions": ["storage", "clipboardWrite"],
+  "permissions": ["storage", "clipboardWrite", "tabs"],
   "background": {
     "service_worker": "background.js"
   },

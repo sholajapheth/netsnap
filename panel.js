@@ -35,6 +35,16 @@ function shortenUrl(url) {
   }
 }
 
+function escapeHtml(value) {
+  // Captured network data may contain arbitrary strings; escape before interpolating into HTML.
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function showToast(msg, color = 'var(--green)') {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -58,8 +68,8 @@ function copyToClipboard(text) {
 // ── NETWORK CAPTURE ────────────────────────────────────
 
 function safeParseJSON(str) {
-  if (!str) return null;
-  try { return JSON.parse(str); } catch { return str; }
+  if (str === null || str === undefined || str === '') return null;
+  try { return JSON.parse(str); } catch { return null; }
 }
 
 chrome.devtools.network.onRequestFinished.addListener((entry) => {
@@ -72,7 +82,8 @@ chrome.devtools.network.onRequestFinished.addListener((entry) => {
   // Get request body
   let requestBody = null;
   if (req.postData) {
-    requestBody = safeParseJSON(req.postData.text) || req.postData.text;
+    const parsed = safeParseJSON(req.postData.text);
+    requestBody = parsed === null ? req.postData.text : parsed;
   }
 
   // Filter sensitive headers
@@ -83,7 +94,8 @@ chrome.devtools.network.onRequestFinished.addListener((entry) => {
   };
 
   entry.getContent((content) => {
-    const responseBody = safeParseJSON(content) || content;
+    const parsed = safeParseJSON(content);
+    const responseBody = parsed === null ? content : parsed;
 
     const captured = {
       id: ++requestIdCounter,
@@ -138,14 +150,14 @@ function renderRequestList() {
     const isSelected = state.selected === r.id;
     return `
       <div class="request-item ${isSelected ? 'selected' : ''}" data-id="${r.id}">
-        <span class="status-badge ${getStatusClass(r.status)}">${r.status || '—'}</span>
-        <span class="request-method">${r.method}</span>
+        <span class="status-badge ${getStatusClass(r.status)}">${escapeHtml(r.status || '—')}</span>
+        <span class="request-method">${escapeHtml(r.method)}</span>
         <button class="add-btn ${inReport ? 'added' : ''}" data-id="${r.id}">
           ${inReport ? '✓ Added' : '+ Add'}
         </button>
-        <span class="request-url">${shortenUrl(r.url)}</span>
+        <span class="request-url">${escapeHtml(shortenUrl(r.url))}</span>
         <span class="request-time" style="grid-column:1;">${r.time}</span>
-        <span class="request-time">${r.duration}</span>
+        <span class="request-time">${escapeHtml(r.duration)}</span>
       </div>`;
   }).join('');
 
@@ -182,9 +194,9 @@ function selectRequest(id) {
   content.style.display = 'block';
 
   const formatJSON = (val) => {
-    if (!val) return '—';
-    if (typeof val === 'string') return val;
-    return JSON.stringify(val, null, 2);
+    if (val === null || val === undefined || val === '') return '—';
+    if (typeof val === 'string') return escapeHtml(val);
+    return escapeHtml(JSON.stringify(val, null, 2));
   };
 
   content.innerHTML = `
@@ -193,13 +205,13 @@ function selectRequest(id) {
         <div class="detail-section-title">Overview</div>
         <div class="meta-grid">
           <span class="meta-key">Status</span>
-          <span class="meta-val"><span class="status-badge ${getStatusClass(r.status)}">${r.status} ${r.statusText}</span></span>
+          <span class="meta-val"><span class="status-badge ${getStatusClass(r.status)}">${escapeHtml(r.status)} ${escapeHtml(r.statusText)}</span></span>
           <span class="meta-key">Method</span>
-          <span class="meta-val" style="color:var(--blue); font-weight:700;">${r.method}</span>
+          <span class="meta-val" style="color:var(--blue); font-weight:700;">${escapeHtml(r.method)}</span>
           <span class="meta-key">Time</span>
-          <span class="meta-val">${r.time} (${r.duration})</span>
+          <span class="meta-val">${escapeHtml(r.time)} (${escapeHtml(r.duration)})</span>
           <span class="meta-key">URL</span>
-          <span class="meta-val">${r.url}</span>
+          <span class="meta-val">${escapeHtml(r.url)}</span>
         </div>
       </div>
 
@@ -299,9 +311,9 @@ function renderReport() {
 
   queueList.innerHTML = state.report.map(r => `
     <div class="queue-item">
-      <span class="status-badge ${getStatusClass(r.status)}" style="flex-shrink:0;">${r.status}</span>
-      <span style="color:var(--blue); font-size:10px; flex-shrink:0;">${r.method}</span>
-      <span style="color:var(--text); font-size:10px; word-break:break-all; flex:1;">${shortenUrl(r.url)}</span>
+      <span class="status-badge ${getStatusClass(r.status)}" style="flex-shrink:0;">${escapeHtml(r.status)}</span>
+      <span style="color:var(--blue); font-size:10px; flex-shrink:0;">${escapeHtml(r.method)}</span>
+      <span style="color:var(--text); font-size:10px; word-break:break-all; flex:1;">${escapeHtml(shortenUrl(r.url))}</span>
       <span class="queue-remove" data-id="${r.id}">×</span>
     </div>
   `).join('');
@@ -452,9 +464,25 @@ document.getElementById('copyJsonBtn').addEventListener('click', () => {
 });
 
 document.getElementById('openViewerBtn').addEventListener('click', () => {
-  const data = btoa(unescape(encodeURIComponent(generateJSON())));
-  chrome.runtime.sendMessage({ type: 'OPEN_VIEWER', data });
-  showToast('🔗 Viewer opened in new tab!');
+  if (state.report.length === 0) {
+    showToast('Report is empty', 'var(--text-dim)');
+    return;
+  }
+
+  const reportJson = generateJSON();
+  const token = (crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `netsnap_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+  const storageKey = `netsnap_report_${token}`;
+  chrome.storage.local.set({ [storageKey]: reportJson }, () => {
+    if (chrome.runtime.lastError) {
+      showToast('Failed to store report for viewer', 'var(--red)');
+      return;
+    }
+    chrome.runtime.sendMessage({ type: 'OPEN_VIEWER', data: token });
+    showToast('🔗 Viewer opened in new tab!');
+  });
 });
 
 // ── INIT ───────────────────────────────────────────────

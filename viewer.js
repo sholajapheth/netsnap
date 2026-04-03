@@ -26,10 +26,20 @@ function getStatusClass(s) {
   return 'so';
 }
 
+function escapeHtml(value) {
+  // Captured network data may contain arbitrary strings; escape before interpolating into HTML.
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatVal(val) {
-  if (!val) return '—';
-  if (typeof val === 'string') return val;
-  return JSON.stringify(val, null, 2);
+  if (val === null || val === undefined || val === '') return '—';
+  if (typeof val === 'string') return escapeHtml(val);
+  return escapeHtml(JSON.stringify(val, null, 2));
 }
 
 function generateWhatsApp(data) {
@@ -66,7 +76,7 @@ function renderReport(data) {
 
   const errorCount = data.requests.filter(r => r.status >= 400).length;
   document.getElementById('reportMeta').innerHTML = `
-    <div class="meta-chip">📅 ${new Date(data.meta.captured_at).toLocaleString()}</div>
+    <div class="meta-chip">📅 ${escapeHtml(new Date(data.meta.captured_at).toLocaleString())}</div>
     <div class="meta-chip">📦 ${data.requests.length} request${data.requests.length !== 1 ? 's' : ''}</div>
     ${errorCount > 0 ? `<div class="meta-chip" style="border-color:rgba(239,68,68,0.4); color:var(--red);">🔴 ${errorCount} error${errorCount !== 1 ? 's' : ''}</div>` : ''}
   `;
@@ -81,27 +91,27 @@ function renderReport(data) {
       <div class="request-card">
         <div class="card-header">
           <span class="req-num">#${i + 1}</span>
-          <span class="status-pill ${sc}">${r.status || '—'} ${r.statusText || ''}</span>
-          <span class="method-pill">${r.method}</span>
-          <span class="card-url">${r.url}</span>
-          <span class="card-time">${r.duration}</span>
+          <span class="status-pill ${sc}">${escapeHtml(r.status || '—')} ${escapeHtml(r.statusText || '')}</span>
+          <span class="method-pill">${escapeHtml(r.method)}</span>
+          <span class="card-url">${escapeHtml(r.url)}</span>
+          <span class="card-time">${escapeHtml(r.duration)}</span>
         </div>
         <div class="card-body">
           ${errorMessage ? `
             <div class="error-banner">
               <span>⚠</span>
-              <span><strong>Server message:</strong> ${errorMessage}</span>
+              <span><strong>Server message:</strong> ${escapeHtml(errorMessage)}</span>
             </div>
             <br>` : ''}
 
           <div class="section-label">Overview</div>
           <div class="info-grid">
             <span class="ig-key">Timestamp</span>
-            <span class="ig-val">${r.timestamp}</span>
+            <span class="ig-val">${escapeHtml(r.timestamp)}</span>
             <span class="ig-key">Duration</span>
-            <span class="ig-val">${r.duration}</span>
+            <span class="ig-val">${escapeHtml(r.duration)}</span>
             <span class="ig-key">Full URL</span>
-            <span class="ig-val">${r.url}</span>
+            <span class="ig-val">${escapeHtml(r.url)}</span>
           </div>
 
           ${r.requestBody ? `
@@ -121,13 +131,54 @@ function renderReport(data) {
 
 // ── LOAD FROM HASH ──────────────────────────────────────
 
+function decodeB64Utf8(b64) {
+  // Reverse of `btoa(unescape(encodeURIComponent(str)))`, but safely Unicode.
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
 function loadReport() {
   try {
     const raw = window.location.hash.substring(1);
     if (!raw) throw new Error('No data in URL hash');
     const hash = decodeURIComponent(raw);
-    const json = decodeURIComponent(escape(atob(hash)));
-    const data = JSON.parse(json);
+
+    // New format: short token -> load report from chrome.storage.
+    // Old format fallback: hash was base64(JSON) stored directly in the URL.
+    const storageKey = `netsnap_report_${hash}`;
+    const looksLikeToken = hash.length <= 120;
+
+    const showError = () => {
+      document.getElementById('errorMsg').style.display = 'block';
+      document.getElementById('requestCards').style.display = 'none';
+      document.getElementById('topMeta').textContent = 'Failed to load report';
+    };
+
+    if (looksLikeToken && chrome?.storage?.local) {
+      chrome.storage.local.get(storageKey, (result) => {
+        try {
+          const stored = result && result[storageKey];
+          if (stored) {
+            const data = JSON.parse(stored);
+            renderReport(data);
+            chrome.storage.local.remove(storageKey);
+            return;
+          }
+          // Not found (or already removed): fall back to old hash format.
+          const jsonStr = decodeB64Utf8(hash);
+          const data = JSON.parse(jsonStr);
+          renderReport(data);
+        } catch (e) {
+          showError();
+        }
+      });
+      return;
+    }
+
+    const jsonStr = decodeB64Utf8(hash);
+    const data = JSON.parse(jsonStr);
     renderReport(data);
   } catch (e) {
     document.getElementById('errorMsg').style.display = 'block';
